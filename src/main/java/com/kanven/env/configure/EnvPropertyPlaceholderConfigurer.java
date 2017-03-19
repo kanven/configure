@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.I0Itec.zkclient.ZkClient;
@@ -13,13 +14,21 @@ import org.springframework.beans.factory.config.PropertyPlaceholderConfigurer;
 
 import com.kanven.env.ZKEnv;
 
-public class EnvPropertyPlaceholderConfigurer extends PropertyPlaceholderConfigurer {
+public class EnvPropertyPlaceHolderConfigurer extends PropertyPlaceholderConfigurer {
 
 	@Override
 	protected Properties mergeProperties() throws IOException {
-		Properties properties = new Properties();
-		Properties merges = super.mergeProperties();
-		
+		Properties properties = new Properties(super.mergeProperties());
+		Map<String, String> entries = getValues();
+		if (entries.size() > 0) {
+			for (Entry<String, String> entry : entries.entrySet()) {
+				String key = entry.getKey();
+				if (properties.containsKey(key)) {
+					continue;
+				}
+				properties.setProperty(key, entry.getValue());
+			}
+		}
 		return properties;
 	}
 
@@ -29,13 +38,14 @@ public class EnvPropertyPlaceholderConfigurer extends PropertyPlaceholderConfigu
 		ZkClient client = new ZkClient(conn, zk.getConnectionTimeout(), new SerializableSerializer(),
 				zk.getOperationRetryTimeout());
 		String node = zk.getNodePath();
-		int len = node.length();
 		Map<String, String> configs = new HashMap<String, String>();
 		List<String> children = client.getChildren(node);
-		for (String child : children) {
-			String key = child.substring(len + 1);
-			String value = client.readData(child);
-			configs.put(key, value);
+		if (children != null && children.size() > 0) {
+			for (String child : children) {
+				String path = node + "/" + child;
+				String value = client.readData(path);
+				configs.put(child, value);
+			}
 		}
 		return configs;
 	}
